@@ -10,3 +10,5 @@ https://www.kaggle.com/paultimothymooney/poetry
 
 https://www.ohhla.com/
 
+Project Proposal is Available from:
+file:///C:/Users/famil/Downloads/Natural_Language_Generation_Proposal%20(1).pdf
