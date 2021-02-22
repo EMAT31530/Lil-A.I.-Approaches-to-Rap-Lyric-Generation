@@ -1,15 +1,14 @@
 # ~~~~~~ IMPORTS ~~~~~~
 import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
 import os
-import math
+import sys
 import string
 import re  # For splitting strings with multiple delimiters
 
 from wordcloud import WordCloud, STOPWORDS, ImageColorGenerator
 from PIL import Image
 
+import PipelineV6 as pipeline
 # ~~~~~~ References~~~~~~
 
 
@@ -67,8 +66,6 @@ def create_wordcloud(text):
 
     mask = np.array(Image.open(os.path.join(currdir, "cloud.png")))
 
-    stopwords = stopwords2
-
     wc = WordCloud(background_color="white",
                    mask=mask,
                    max_words=200)
@@ -82,11 +79,9 @@ def create_wordcloud(text):
 # Stopwords to be removed for formatting
 stopwords_format = {'br', '<br>', 'href', '\n', '<br />', "i'm", 'nan', '/>',
                     '<br', 'ilink', '"', 'r', 'n', 'i', 'of', 'for', 'in'
-                    'to', 'as', 'an', 'or', 'www', 'com', 'sf', 'p', 'sx', 'az', 'im'}
+                    'to', 'as', 'an', 'or', 'www', 'com', 'sf', 'p', 'sx', 'az', 'im', 'se'}
 
-numbers = {'1', '2', '3', '4', '5', '6', '7', '8', '9', '0',
-           'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'
-           'hundred', 'thousand'}
+numbers = {'1', '2', '3', '4', '5', '6', '7', '8', '9', '0'}
 
 stopwords_uncommon = {'right', 'now', 'currently', 'will', 'often', 'though', 'even',
                       'amp', 'thing', 'stuff', 'know', 'best', 'mean', 'moment',
@@ -110,48 +105,31 @@ stopwords_qualifiers = {'very', 'much', 'lot', 'little', 'big', 'small', 'quite'
                         'like', 'never', 'actually', 'commonly', 'old', 'might', 'enough', 'yet', 'moved', 'next',
                         'finally', 'lastly', 'clever', 'smart', 'every', 'cool', 'definitely', 'absolutely'}
 
+pipeline.import_github(write_type='both')
+
 # Wordcloud common stopwords
 stopwords_wc = STOPWORDS
 # Form the total stopwords list
 stopwords2 = stopwords_format | numbers | stopwords_wc | stopwords_uncommon | stopwords_connectives \
-             | stopwords_specific | stopwords_qualifiers
+             | stopwords_specific
 punctuation = string.punctuation
 letters = string.ascii_letters
 
 # ~~ Main Code ~~
 # Load the ratings data
 print('Loading Profiles ...')
-dataF = pd.read_csv('profiles.csv')
+with open("AllLyrics_clean.txt", 'r') as temp_file:
+    dataF = temp_file.readlines()
 print('Profiles Loaded')
 
+
 # Convert from a DataFrame to a numpy array
-data = dataF.to_numpy()
-
-# Select the essay question columns
-essay1 = dataF["essay1"]  # Interests
-essay2 = dataF["essay2"]  # What are your talents
-essay3 = dataF["essay3"]  # What are your best pyhsical features
-essay4 = dataF["essay4"]  # What type of music do you like
-essay5 = dataF["essay5"]  # What do you love in life (possibly)
-essay6 = dataF["essay6"]  # What do you normally think about (possibly)
-essay7 = dataF["essay7"]  # What do you normally get up to (possibly)
-essay8 = dataF["essay8"]  # What's your biggest secret (possibly)
-essay9 = dataF["essay9"]  # What are you looking for in your dream person
-
-essay_arr = [essay1, essay2, essay3, essay4, essay5, essay6, essay7, essay8, essay9]
-
-# filter_text('current.txt', itemsToRemove)
+essay1_lst = dataF
 
 # Keep track of the current directory
 currdir = os.path.dirname(__file__)
 
-# Convert the essay to a np array then to a list then to a string
-essay1_arr = essay1.to_numpy()
-
-# np to list
-essay1_lst = essay1_arr.tolist()
-
-print('Minimum size before: ', np.shape(essay1_lst))
+print('Minimum size before: ', len(essay1_lst))
 
 # Remove line breaks
 essay1_str = ' '.join(str(v) for v in essay1_lst if str(v) != '\n')
@@ -171,7 +149,6 @@ print('Shape After: ', np.shape(essay1_lst))
 
 create_wordcloud(essay1_str)
 
-print('\n')  # Newline
 print('Wordcloud generated!')
 
 write_essay(essay1_lst)
