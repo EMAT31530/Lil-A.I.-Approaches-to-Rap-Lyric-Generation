@@ -15,17 +15,17 @@ import PipelineV6 as pipeline
 # ~~~~~~ Functions ~~~~~~
 def write_essay(essay):
     # Add a space to the file, to make sure it always exists
-    with open('current.txt', 'w') as f:
+    with open('current_cloud.txt', 'w') as f:
         f.write(' ')
     f.close()
 
     # Clear the text file
-    with open('current.txt', 'r+') as f:
+    with open('current_cloud.txt', 'r+') as f:
         f.truncate(0)
     f.close()
 
     # Write all of the lines to the file
-    with open('current.txt', 'w') as f:
+    with open('current_cloud.txt', 'w') as f:
         for line in essay:
             line_str = str(line)
             f.write(line_str)
@@ -62,7 +62,7 @@ def essay_tolistandstr(essay):
     return zip(essay_str, essay_lst)
 
 
-def create_wordcloud(text):
+def _create_wordcloud(text):
 
     mask = np.array(Image.open(os.path.join(currdir, "cloud.png")))
 
@@ -147,7 +147,7 @@ essay1_lst = essay1_str.split()
 
 print('Shape After: ', np.shape(essay1_lst))
 
-create_wordcloud(essay1_str)
+_create_wordcloud(essay1_str)
 
 print('Wordcloud generated!')
 
