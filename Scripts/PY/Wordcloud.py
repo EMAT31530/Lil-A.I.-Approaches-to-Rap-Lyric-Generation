@@ -1,6 +1,7 @@
 # ~~~~~~ IMPORTS ~~~~~~
 import numpy as np
 import os
+from pathlib import Path
 import sys
 import string
 import re  # For splitting strings with multiple delimiters
@@ -8,7 +9,7 @@ import re  # For splitting strings with multiple delimiters
 from wordcloud import WordCloud, STOPWORDS, ImageColorGenerator
 from PIL import Image
 
-import PipelineV6 as pipeline
+import PipelineV7 as pipeline
 # ~~~~~~ References~~~~~~
 
 
@@ -105,7 +106,7 @@ stopwords_qualifiers = {'very', 'much', 'lot', 'little', 'big', 'small', 'quite'
                         'like', 'never', 'actually', 'commonly', 'old', 'might', 'enough', 'yet', 'moved', 'next',
                         'finally', 'lastly', 'clever', 'smart', 'every', 'cool', 'definitely', 'absolutely'}
 
-pipeline.import_github(write_type='both')
+
 
 # Wordcloud common stopwords
 stopwords_wc = STOPWORDS
@@ -118,8 +119,17 @@ letters = string.ascii_letters
 # ~~ Main Code ~~
 # Load the ratings data
 print('Loading Profiles ...')
-with open("AllLyrics_clean.txt", 'r') as temp_file:
+path_clean = "AllLyrics_clean.txt"
+path_clean_temp = Path(path_clean)
+
+# If it doesn't exist, we need to import it from the Github repository
+if not path_clean_temp.is_file():
+    # Import the data using the pipeline package
+    pipeline.import_github(write_type='both')
+
+with open(path_clean, 'r') as temp_file:
     dataF = temp_file.readlines()
+
 print('Profiles Loaded')
 
 
