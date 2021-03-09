@@ -11,3 +11,5 @@ https://www.kaggle.com/paultimothymooney/poetry
 
 https://www.ohhla.com/
 
+http://www.delphiforfun.org/programs/Syllables.htm
+
