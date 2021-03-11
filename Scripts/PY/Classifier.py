@@ -38,10 +38,10 @@ test_out = np.array(test_out)
 train_in = np.array(train_in)
 train_out = np.array(train_out)
 
-max_word_length = 143
+max_word = 143
 
 model = keras.Sequential()
-model.add(keras.layers.Embedding(max_word_length, 100))
+model.add(keras.layers.Embedding(max_word, 100))
 model.add(keras.layers.GlobalAveragePooling1D())
 model.add(keras.layers.Dense(100, activation=tf.nn.relu))
 model.add(keras.layers.Dense(50, activation=tf.nn.relu))
