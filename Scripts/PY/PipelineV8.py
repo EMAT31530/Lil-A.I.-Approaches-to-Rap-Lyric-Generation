@@ -232,7 +232,7 @@ def update_github(write_bool=False, ui_enabled=False, write_type='both', __PAT='
         elif name.lower() == "capitals.csv":
             capitals = csv_decode_and_write(file_, name)
         else:
-            csv_decode_and_write(file_, name)
+            _ = csv_decode_and_write(file_, name)
     print("All editing csv files are up to date!")
 
     print("Importing Github uncleaned text files...")
@@ -241,9 +241,11 @@ def update_github(write_bool=False, ui_enabled=False, write_type='both', __PAT='
     RAP_DATA = []
     rap_lyric_names = []
 
-    for file_ in contents:
+    for counter, file_ in enumerate(contents):
         path = file_.path
+        print("File {} ".format(counter + 1) + path)
         path = str(path)
+
         # Only choose the .txt files
         if path[-4:] == '.txt':
             # Append the name
@@ -273,6 +275,7 @@ def update_github(write_bool=False, ui_enabled=False, write_type='both', __PAT='
                 RAP_DATA[count] = RAP_DATA[count].replace(str(capitals[i, 0]), str(capitals[i, 1]))
 
     contents = project_clone.get_contents("RapLyrics/CLEAN", ref=branch)
+    print('\nImporting Github cleaned text files...')
     cleaned_names = []
     for counter, file_ in enumerate(contents):
         path = file_.path
@@ -290,7 +293,7 @@ def update_github(write_bool=False, ui_enabled=False, write_type='both', __PAT='
 
     # If the (now cleaned) rap_lyrics name is new (not in cleaned_names), then we want to create that as a new file
     # If the (now cleaned) rap_lyrics name is NOT new (not in cleaned_names), then we want to update the file
-    print("Commiting files to github...")
+    print("Commiting files back to github...")
     for counter, new_name in enumerate(rap_lyric_names):
         if new_name in cleaned_names:
             duplicate = project_clone.get_contents("RapLyrics/CLEAN/{}CL.txt".format(new_name), ref=branch)
@@ -300,7 +303,7 @@ def update_github(write_bool=False, ui_enabled=False, write_type='both', __PAT='
         else:
             project_clone.create_file("RapLyrics/CLEAN/{}CL.txt".format(new_name),
                                       "This was uploaded automatically via pipeline", RAP_DATA[counter], branch=branch)
-
+    print('Files commited. Process finished. You will NEED to import now, update does not work')
     if write_bool:
         _check_write_type(project_clone, branch, write_type)
 
@@ -309,41 +312,21 @@ def update_github(write_bool=False, ui_enabled=False, write_type='both', __PAT='
     del contents
 
 
-def clean(path='AllLyrics_unclean.txt', __PAT=''):
-    temp_path = Path(path)
-    if not temp_path.is_file():
-        import_github(write_type='unclean-only', __PAT=__PAT)
-
-    with open(path, 'r') as temp_file:
-        RAP_DATA = temp_file.readlines()
+def clean(lyrics):
+    rap_data = lyrics
 
     censors = pd.read_csv("censors.csv")
     capitals = pd.read_csv("capitals.csv")
     censors = censors.to_numpy()
     capitals = capitals.to_numpy()
 
-    # for i in range(len(censors)):
-    #     print(str(censors[i, 0]), str(censors[i, 1]))
     for i in range(len(censors)):
-        for j in range(len(RAP_DATA)):
-            RAP_DATA[j] = RAP_DATA[j].replace(str(censors[i, 0]), str(censors[i, 1]))
+        rap_data = rap_data.replace(str(censors[i, 0]), str(censors[i, 1]))
 
     for i in range(len(capitals)):
-        for j in range(len(RAP_DATA)):
-            RAP_DATA[j] = RAP_DATA[j].replace(str(capitals[i, 0]), str(capitals[i, 1]))
+        rap_data = rap_data.replace(str(capitals[i, 0]), str(capitals[i, 1]))
 
-    # # Censor the profanities O(n*m + n*m2) m > m2 xor m2 > m
-    # if type(censors) != int:
-    #     for count in range(len(RAP_DATA)):
-    #         for i in range(len(censors[0:])):
-    #             RAP_DATA[count] = RAP_DATA[count].replace(str(censors[i, 0]), str(censors[i, 1]))
-    #
-    # if type(censors) != int:
-    #     for count in range(len(RAP_DATA)):
-    #         for i in range(len(capitals[0:])):
-    #             RAP_DATA[count] = RAP_DATA[count].replace(str(capitals[i, 0]), str(capitals[i, 1]))
-
-    return RAP_DATA
+    return rap_data
 
 
 # Source: GitHub User: "MikeMNelhams"
@@ -351,6 +334,8 @@ def clean(path='AllLyrics_unclean.txt', __PAT=''):
 
 if __name__ == "__main__":
     __PAT_G = passwordbox("Enter your GitHub PAT", "Input")  # Treat PAT like a password
-    raps = clean("AllLyrics_clean.txt", __PAT=__PAT_G)
-    print(raps)
+    # raps = clean("AllLyrics_clean.txt", __PAT=__PAT_G)
+    # print(raps)
+    import_github(__PAT=__PAT_G)
+    # import_github(__PAT=__PAT_G)
     del __PAT_G

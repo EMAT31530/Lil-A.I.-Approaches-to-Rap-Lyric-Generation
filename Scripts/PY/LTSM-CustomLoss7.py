@@ -186,11 +186,18 @@ def generate_rap_lyrics(model_input, bars_input, padding_len, words_int_input, i
 
     for _ in range(next_words):
         token_list_local = sentence_to_integer(lyrics, words_int_input)
-        token_list_local = pad_sequences([token_list_local], maxlen=padding_length - 1, padding='pre')
+        token_list_local = pad_sequences([token_list_local], maxlen=padding_len - 1, padding='pre')
         predicted = model_input.predict_classes(token_list_local, verbose=0)
         lyrics += ' ' + int_words_input[predicted[0]]
 
-    return lyrics.capitalize()
+    lyrics = pipeLine.clean(lyrics.capitalize())
+
+    # Add newlines every 10 tokens
+    lyrics = lyrics.split(' ')
+    lyrics = [lyrics[index] + '\n' if index % 10 == 0 and index != 0 else lyrics[index] for index in range(len(lyrics))]
+    lyrics = ' '.join(lyrics)
+
+    return lyrics
 
 
 def g2p_lazy(word, g2p):
@@ -272,9 +279,8 @@ class CustomModel:
         self.model.add(Dropout(0.2))
         self.model.add(Dense(256))
         self.model.add(Dense(vocab_size, activation='softmax'))
-        # self.model.compile(loss='categorical_crossentropy', metrics=['accuracy'], optimizer='adam', run_eagerly=True)
-        # self.model.compile(loss=custom_loss, metrics=['accuracy'], optimizer='adam', run_eagerly=True)
-        self.model.compile(loss=self.custom_loss_inner, metrics=['accuracy'], optimizer='adam', run_eagerly=True)
+        self.model.compile(loss='categorical_crossentropy', metrics=['accuracy'], optimizer='adam', run_eagerly=True)
+        # self.model.compile(loss=self.custom_loss_inner, metrics=['accuracy'], optimizer='adam', run_eagerly=True)
         self.cp_callback = tf.keras.callbacks.ModelCheckpoint(filepath=path,
                                                               save_weights_only=True,
                                                               verbose=1)
@@ -309,12 +315,20 @@ class CustomModel:
             name="phone_word_hash"
         )
 
+        # For clever manipulations, we will save the previous predictions
+        self.previous_predictions = 0
+        self.batch_size = 32
+
     def load(self):
         # Loads the weights
-        self.model.load_weights(self.path)
-        print('Restored Model')
+        try:
+            self.model.load_weights(self.path)
+            print('Restored Model')
+        except FileNotFoundError:
+            print('Directory {} does not exist'.format(self.path))
 
     def train(self, _x_train, _y_train, _tensorboard=None, epochs=30, batch_size=512, verbose=1):
+        self.batch_size = tf.constant(batch_size)
         checkpoint_Path = Path(self.path + '.index')
         if _tensorboard is not None:
             self.model.fit(_x_train, _y_train, epochs=epochs, validation_split=0.15,
@@ -328,27 +342,40 @@ class CustomModel:
                                      batch_size=batch_size, callbacks=[self.cp_callback],
                                      verbose=verbose)
 
-        # save_path = self.path[:11] + 'history.txt'
-        # with open(save_path, 'wb') as output_file:
-        #     pickle.dump()
-
     def test(self, _x_test, _y_train):
         self.loss = self.model.evaluate(x_train, y_train)
         print("Model loss on training: {}".format(self.loss))
         return self.loss
 
     def custom_loss_inner(self, y_true, y_pred):
+        # This allows biasing rhyming patterns between batches
+        loss_categorical = categorical_crossentropy(y_true, y_pred)
+
+        if type(self.previous_predictions) == int:
+            # Save the current predictions
+            self.previous_predictions = tf.argmax(tf.identity(y_pred), axis=1, output_type=tf.int32)
+
+            return loss_categorical
+
+        # Only perform the rhyme check if the batch size matches the global batch size
+        if self.batch_size != tf.shape(y_pred)[0]:
+            return loss_categorical
+
+        # Load the previous predictions
+        y_pred2 = self.previous_predictions
 
         # Convert to prediction integers
-        y_true2 = tf.argmax(tf.identity(y_true), axis=1, output_type=tf.int32)
-        y_pred2 = tf.argmax(tf.identity(y_pred), axis=1, output_type=tf.int32)
+        y_pred1 = tf.argmax(tf.identity(y_pred), axis=1, output_type=tf.int32)
+
+        # Save the current predictions IF it matches batch size.
+        self.previous_predictions = tf.identity(y_pred1)
 
         # Hash table lookup the corresponding words
-        y_true2 = self.hash_table.lookup(y_true2)
+        y_pred1 = self.hash_table.lookup(y_pred1)
         y_pred2 = self.hash_table.lookup(y_pred2)
 
-        loss_custom = custom_loss(y_true2, y_pred2, self.phoneme_hash_table)
-        loss_categorical = categorical_crossentropy(y_true, y_pred)
+        loss_custom = custom_loss(y_pred1, y_pred2, self.phoneme_hash_table)
+
         loss_weighted = tf.add(loss_categorical, tf.scalar_mul(0.1, loss_custom))
 
         return loss_weighted
@@ -415,8 +442,8 @@ if __name__ == "__main__":
     tensorboard = TensorBoard(log_dir="logs/{}".format(time()))
 
     lstm = CustomModel(x_train, y_train, int_to_word, path="training_9/cp.ckpt", verbose=False)
-    lstm.train(x_train, y_train, epochs=20, batch_size=512, verbose=1)
-    # lstm.load()
+    # lstm.train(x_train, y_train, epochs=60, batch_size=512, verbose=1)
+    lstm.load()
 
     generated_lyrics = generate_rap_lyrics(lstm.model, bars, padding_length, word_to_int, int_to_word)
     print('Generated Lyrics: ', generated_lyrics)
