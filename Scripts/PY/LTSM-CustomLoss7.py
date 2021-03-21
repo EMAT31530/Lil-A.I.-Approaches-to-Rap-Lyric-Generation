@@ -1,6 +1,10 @@
 # Our library imports
 import PipelineV8 as pipeLine
 
+# Allow XLA enhanced training
+import os
+os.environ['TF_XLA_FLAGS'] = '--tf_xla_enable_xla_devices'
+
 # Machine Learning and maths imports
 from tensorflow.keras.utils import to_categorical
 from tensorflow.keras.models import Sequential
@@ -11,6 +15,7 @@ from tensorflow.keras.losses import categorical_crossentropy
 from tensorflow.keras.optimizers import SGD
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import TensorBoard
+from sklearn.model_selection import train_test_split
 import tensorflow as tf
 
 import numpy as np
@@ -22,7 +27,7 @@ import pronouncing
 from g2p_en import G2p
 
 # System imports
-import os
+import pickle
 import sys
 from time import time
 from pathlib import Path
@@ -34,11 +39,12 @@ import matplotlib.pyplot as plt
 physical_devices = tf.config.list_physical_devices('GPU')
 tf.config.experimental.set_memory_growth(physical_devices[0], True)
 
-# Remove pesky information lines from tensorflow
-os.environ['TF_XLA_FLAGS'] = '--tf_xla_enable_xla_devices'
-
 
 # Function
+def num_there(s):
+    return any(i.isdigit() for i in s)
+
+
 def frequency_count(lyrics):
     """ O(n) frequency count
     :param lyrics: list of strings
@@ -79,13 +85,13 @@ def generate_content_vocab(path="AllLyrics_unclean.txt", import_data=True, allow
         _content = f.readlines()
 
     # Defined content in case we need to split each line/bar into strings
-    _content = [_content[i].rstrip() for i in range(len(_content)) if _content[i] != '\n']
+    _content = [_content[i].rstrip() for i in range(len(_content)) if _content[i] != '\n' and not num_there(_content[i])]
 
     if allow_digits:
         _vocabulary = ''.join([i if i != '\n' else ' ' for i in text]).replace("\n", " ").split(' ')
     else:
         _vocabulary = ''.join([i if not i.isdigit() and i != '\n' else ' ' for i in text]).replace("\n", " ").split(' ')
-        _vocabulary = [word for word in _vocabulary if word != '']
+        _vocabulary = [word for word in _vocabulary if word != '' and not num_there(word)]
 
     return _content, _vocabulary
 
@@ -278,7 +284,6 @@ class CustomModel:
         if verbose:
             self.model.summary()  # Print model summary to console
 
-        self.history = []
         self.path = path
         self.int_to_words = int_to_words
         # Build a lookup hash table for which words correspond to which tokens
@@ -312,15 +317,20 @@ class CustomModel:
     def train(self, _x_train, _y_train, _tensorboard=None, epochs=30, batch_size=512, verbose=1):
         checkpoint_Path = Path(self.path + '.index')
         if _tensorboard is not None:
-            self.model.fit(_x_train, _y_train, epochs=epochs, batch_size=batch_size, callbacks=[_tensorboard],
+            self.model.fit(_x_train, _y_train, epochs=epochs, validation_split=0.15,
+                           batch_size=batch_size, callbacks=[_tensorboard],
                            verbose=verbose)
             return
 
         if not checkpoint_Path.is_file():
             # Train the model
-            history = self.model.fit(_x_train, _y_train, epochs=epochs, batch_size=batch_size, callbacks=[self.cp_callback],
+            self.model.fit(_x_train, _y_train, epochs=epochs, validation_split=0.15,
+                                     batch_size=batch_size, callbacks=[self.cp_callback],
                                      verbose=verbose)
-            self.history.append(history)
+
+        # save_path = self.path[:11] + 'history.txt'
+        # with open(save_path, 'wb') as output_file:
+        #     pickle.dump()
 
     def test(self, _x_test, _y_train):
         self.loss = self.model.evaluate(x_train, y_train)
@@ -343,6 +353,12 @@ class CustomModel:
 
         return loss_weighted
 
+    def plot_loss(self):
+        loss_train = self.model.history['loss']
+        loss_val = self.model.history['val_loss']
+        print(loss_train)
+        sys.exit()
+
 
 if __name__ == "__main__":
     # Global params:
@@ -363,6 +379,7 @@ if __name__ == "__main__":
     # Need to reverse this at the end to reverse numbers back into words
     word_to_int = {words[i]: i for i in range(len(words))}
     print('Word to int local: ', word_to_int)
+    print('Number of unique words: ', len(words))
 
     word_dict = frequency_count(vocab)
     sort_dict = sorted(word_dict.items(), key=lambda x: x[1], reverse=True)
@@ -389,13 +406,16 @@ if __name__ == "__main__":
 
     y_train = tf.keras.utils.to_categorical(y_train, num_classes=vocab_size)
 
+    # Split into testing and training randomly
+    x_train, x_test, y_train, y_test = train_test_split(x_train, y_train, test_size=0.3, random_state=1)
+
     # Check if the model exists:
     # Need to compile model now
 
     tensorboard = TensorBoard(log_dir="logs/{}".format(time()))
 
-    lstm = CustomModel(x_train, y_train, int_to_word, path="training_8/cp.ckpt", verbose=False)
-    lstm.train(x_train, y_train, epochs=50, batch_size=512, verbose=1)
+    lstm = CustomModel(x_train, y_train, int_to_word, path="training_9/cp.ckpt", verbose=False)
+    lstm.train(x_train, y_train, epochs=20, batch_size=512, verbose=1)
     # lstm.load()
 
     generated_lyrics = generate_rap_lyrics(lstm.model, bars, padding_length, word_to_int, int_to_word)
